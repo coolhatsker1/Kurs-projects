@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 "made each number float to simplify operations "
-        
+"didn't add output of the duplicated names in the form of a range"
 def main(args):
 
     
@@ -12,17 +12,17 @@ def main(args):
     
     names = []
     salary = []
-    for element in args:
+    for element in args:#creating arrays of names and salaries
         split_element = element.split(":")
         names.append(split_element[0])
         salary.append(float(split_element[1]))
 
         
-    sorted_arrays = sorted(zip(salary, names), reverse=reverse)
+    sorted_arrays = sorted(zip(salary, names), reverse=reverse)#sorting arrays and unpacking them
     salary, names = zip(*sorted_arrays)
     
     for i in range(len(names)):
-        space_num = max(len(word) for word in names)-len(names[i])
+        space_num = max(len(word) for word in names)-len(names[i])#calculating needed spaces
         print(names[i].title(), int(space_num) * " ", salary[i])
         
 if __name__ == '__main__':
