@@ -1,6 +1,7 @@
 import cmath
 import functools
 import math
+import numpy as np
 
 
 class Vector:
@@ -26,18 +27,6 @@ class Vector:
 
         #print('this is lazy, doing computations...')
         return abs(self.x + 1j * self.y)
-
-
-##    @property
-##    def length(self):
-##        if not hasattr(self, '_length'):
-##            print('computing')
-##            self._length = abs(self.x + 1j * self.y)
-##        return self._length
-
-# @length.setter
-# def length(self, val):
-#     print(f'Attemting to set length to {val}')
 
     @classmethod
     def from_polar(cls, length, angle, *, isdeg=True):
@@ -109,7 +98,10 @@ class Vector:
         # vector cross product and dot product
         # Note: you may use __mul__ for dot product,
         # and __matmul__ for cross product
-        raise NotImplementedError('not done yet, see TODO')
+        return np.dot(self, other)
+    
+    def __matmul__(self, other):
+        return np.cross(self, other)
 
     def __truediv__(self, other):
         if not other:
@@ -158,3 +150,5 @@ if __name__ == '__main__':
     two = Vector.from_polar(10, 135)
 
     angle = Vector.angle_between(one, two)
+    print(f'{vec} * {oth} \t= {vec * oth} (dot product)')
+    print(f'{vec} @ {oth} \t= {vec @ oth} (cross product)')
