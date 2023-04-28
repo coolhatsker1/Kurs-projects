@@ -150,5 +150,5 @@ if __name__ == '__main__':
     two = Vector.from_polar(10, 135)
 
     angle = Vector.angle_between(one, two)
-    print(f'{vec} * {oth} \t= {vec * oth} (dot product)')
-    print(f'{vec} @ {oth} \t= {vec @ oth} (cross product)')
+    print(f'{vec} * {oth} = {vec * oth} (dot vector product)')
+    print(f'{vec} @ {oth} = {vec @ oth} (cross vector product)')
