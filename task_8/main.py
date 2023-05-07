@@ -3,6 +3,9 @@
 import json
 
 from urllib import request
+
+import datetime
+
 # TODO: try using Requests package
 #       (https://requests.readthedocs.io)
 
@@ -108,8 +111,7 @@ class City(RequestData):
 
 
 class Weather(RequestData):
-    URL_TEMPLATE = ('https://api.open-meteo.com/v1/forecast?'
-                    'latitude={lat}&longitude={lon}&current_weather=true')
+    URL_TEMPLATE = ('https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m')
 
     def __init__(self, city=None, latitude=None, longitude=None):
         # TODO: try getting latitute and longitude from city name
@@ -139,6 +141,23 @@ class Weather(RequestData):
             self.request()
         return self.data['current_weather']['temperature']
 
+    def humidity(self):
+        '''Retrieve relative humidity in %'''
+        if self.data is None:
+            self.request()
+
+        dateTimeObj = datetime.datetime.now()
+        curr_date = dateTimeObj.strftime("%Y-%m-%dT%H")
+        index_el = 0
+        for k, v in self.data.items():
+            if k == 'hourly':
+                for i, el in enumerate(v['time']):
+                    if el[:-3] == curr_date:
+                        index_el = i
+                        break
+
+        rh_data = v['relativehumidity_2m'][index_el]
+        return rh_data
 
 # TODO: add argument parsing
 # TODO: try setting city as: Ukraine/Kyiv or simply Kyiv
@@ -154,5 +173,5 @@ if __name__ == '__main__':
     city.request()
 
     wth = Weather(latitude=city.latitude, longitude=city.longitude)
-
-    print(f'Temperature in {city.name} is {wth.temperature}')
+    #print(f'Temperature in {city.name} is {wth.temperature}')
+    print(f'Humidity in {city.name} is {wth.humidity()}')
