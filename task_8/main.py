@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
 import json
-
-from urllib import request
-
+import requests
 import datetime
+from geopy.geocoders import Nominatim
 
 # TODO: try using Requests package
 #       (https://requests.readthedocs.io)
@@ -16,15 +15,15 @@ def make_request(url):
     # to get encoding from there
     # (content-type: text/html; charset=UTF-8)
     # TODO: try parsing it with regexp
-    respfile = request.urlopen(url)
+    respfile = requests.get(url)
 
     hdr = respfile.headers
     ct = hdr.get('content-type', '; charset=UTF-8')
     enc = ct.split(';')[-1].split('=')[-1]
     enc = enc.lower()
 
-    bindata = respfile.read()
-    data = bindata.decode(encoding=enc)
+    # bindata = respfile.read()
+    data = respfile.content.decode(encoding=enc)
     return data
 
 
@@ -70,34 +69,11 @@ class City(RequestData):
 
         # code below executes only if we didn't raise an exception
         for k, v in cities[self.name].items():
-            # same as self.__dict__.update(res.get(self.name, {}))
-            # but more portable
             setattr(self, k, v)
-
-        # Set instance attributes if exact match found
-        # if self.name in cities:
-        #     item = cities[self.name]
-        #     self.latitude = cities['latitude']
-        #     self.longitude = cities['longitude']
-        #     self.country = cities['country']
 
     def find_cities(self):
         data = super().request(name=self.name)
         data = data.get('results', {})
-        # transform into data structure of the form:
-        # {'Kyiv': {
-        #   'latitude': 50.45466,
-        #   'longitude': 30.5238,
-        #   'country': 'Ukraine'
-        #   },
-        #  'Kyivske': { ... },
-        # }
-
-        # extract = ['latitude', 'longitude', 'country']
-        # res = {entry['name']: {k: entry[k] for k in extract}
-        #        for entry in data}
-
-        # Transform data structure
         res = {}
         for entry in data:
             name = entry['name']
@@ -111,20 +87,28 @@ class City(RequestData):
 
 
 class Weather(RequestData):
-    URL_TEMPLATE = ('https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m')
+    URL_TEMPLATE = ('https://api.open-meteo.com/v1/forecast?'
+                    'latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m')
 
     def __init__(self, city=None, latitude=None, longitude=None):
         # TODO: try getting latitute and longitude from city name
         #       if not provided directly
         # i.e. Weather(city='kyiv') or Weather(latitude=30, longitude=40)
+        if isinstance(city, str):
+            # Create a City object from the city name
+            city = City(name=city)
+            city.request()
+
         if (city is None) and (latitude is None or longitude is None):
             msg = ('Either city or a pair of latitude, '
                    'longitude must be provided')
             raise WeatherError(msg)
-        ...
-        self.lat = latitude
-        self.lon = longitude
+
+        self.city = city
+        self.lat = latitude or city.latitude
+        self.lon = longitude or city.longitude
         self.data = None
+
 
     def __repr__(self):
         n = type(self).__name__
@@ -134,6 +118,15 @@ class Weather(RequestData):
         data = super().request(lat=self.lat, lon=self.lon)
         self.data = data
 
+    def get_city(self):
+        '''makes possible to output city name if it is parsed via name as an attribute or a pair of coordinates'''
+        if isinstance(city, str):
+            if self.city:
+                return self.city.name if self.city else None
+        else:
+            geolocator = Nominatim(user_agent="my-app")
+            location = geolocator.reverse((self.lat, self.lon))
+            return location.raw["address"]["city"]
     @property
     def temperature(self):
         """Retreive temperature from OpenMeteo response."""
@@ -141,8 +134,32 @@ class Weather(RequestData):
             self.request()
         return self.data['current_weather']['temperature']
 
+    @property
+    def timeofreq(self):
+        """Retreive time of an OpenMeteo response."""
+        if self.data is None:
+            self.request()
+        return self.data['current_weather']['time']
+
+    @property
+    def elevation(self):
+        """Retreive elevation from OpenMeteo response."""
+        if self.data is None:
+            self.request()
+        return self.data['elevation']
+
+    @property
+    def windspeed(self):
+        """Retreive windspeed from OpenMeteo response."""
+        if self.data is None:
+            self.request()
+        return self.data['current_weather']['windspeed']
+
+    @property
     def humidity(self):
-        '''Retrieve relative humidity in %'''
+        '''Retrieve relative humidity in %
+           Works only for the cities where weather forecast is provided hourly such as lat=52.52 lon=13.419998
+        '''
         if self.data is None:
             self.request()
 
@@ -165,13 +182,31 @@ class Weather(RequestData):
 if __name__ == '__main__':
     from pprint import pprint
 
-    # very simple args get
+
     import sys
-    name = sys.argv[1] if len(sys.argv) == 2 else 'kyiv'
+    name = sys.argv[1] if len(sys.argv) == 2 else 'lviv'
 
     city = City(name)
     city.request()
 
-    wth = Weather(latitude=city.latitude, longitude=city.longitude)
-    #print(f'Temperature in {city.name} is {wth.temperature}')
-    print(f'Humidity in {city.name} is {wth.humidity()}')
+    print('Parsing city object as a pair of coordinates')
+    wth = Weather(latitude=52.52, longitude=13.419998)
+    print(f'Temperature in {wth.get_city()} is {wth.temperature} by {wth.timeofreq}')
+    print(f'Elevation in {wth.get_city()} is {wth.elevation} by {wth.timeofreq}')
+    print(f'Windspeed in {wth.get_city()} is {wth.windspeed} by {wth.timeofreq}')
+    print(f'Relative humidity in {wth.get_city()} is {wth.humidity} by {wth.timeofreq}\n')
+
+    print('Parsing city object as an object')
+    wth = Weather(city=city)
+    print(f'Temperature in {city.name} is {wth.temperature} by {wth.timeofreq}')
+    print(f'Elevation in {city.name} is {wth.elevation} by {wth.timeofreq}')
+    print(f'Windspeed in {city.name} is {wth.windspeed} by {wth.timeofreq}')
+    print(f'Relative humidity in {city.name} is {wth.humidity} by {wth.timeofreq}\n')
+
+    print('Parsing city object as a name')
+    wth = Weather(city='kyiv')
+    print(f'Temperature in {wth.get_city()} is {wth.temperature} by {wth.timeofreq}')
+    print(f'Elevation in {wth.get_city()} is {wth.elevation} by {wth.timeofreq}')
+    print(f'Windspeed in {wth.get_city()} is {wth.windspeed} by {wth.timeofreq}')
+    print(f'Relative humidity in {wth.get_city()} is {wth.humidity} by {wth.timeofreq}\n')
+
